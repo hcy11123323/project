@@ -1,0 +1,229 @@
+"""Tests for core.browser_manager — dual-engine browser lifecycle."""
+
+from __future__ import annotations
+
+import os
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from src.core.browser_manager import (
+    BrowserManager,
+    _is_cloak_enabled,
+    get_browser_manager,
+    reset_browser_manager,
+)
+
+
+# ---------------------------------------------------------------------------
+# _is_cloak_enabled
+# ---------------------------------------------------------------------------
+
+
+class TestIsCloakEnabled:
+    """Tests for the _is_cloak_enabled helper."""
+
+    def test_default_false(self):
+        """Should return False when USE_CLOAKBROWSER is not set."""
+        with patch.dict("os.environ", {}, clear=False):
+            os.environ.pop("USE_CLOAKBROWSER", None)
+            assert _is_cloak_enabled() is False
+
+    @pytest.mark.parametrize(
+        "value, expected",
+        [
+            ("true", True),
+            ("True", True),
+            ("TRUE", True),
+            (" true ", True),
+            ("false", False),
+            ("False", False),
+            ("0", False),
+            ("no", False),
+            ("", False),
+        ],
+    )
+    def test_env_values(self, value, expected):
+        """Should parse various env string values correctly."""
+        with patch.dict("os.environ", {"USE_CLOAKBROWSER": value}):
+            assert _is_cloak_enabled() is expected
+
+
+# ---------------------------------------------------------------------------
+# BrowserManager — Playwright engine (default)
+# ---------------------------------------------------------------------------
+
+
+class TestBrowserManagerPlaywright:
+    """Tests for BrowserManager with Playwright engine."""
+
+    def setup_method(self):
+        reset_browser_manager()
+
+    def teardown_method(self):
+        reset_browser_manager()
+
+    @patch("src.core.browser_manager.sync_playwright")
+    def test_launch_playwright(self, mock_pw):
+        """Should launch via Playwright by default."""
+        # sync_playwright() returns context, .start() returns the actual pw instance
+        mock_context = MagicMock()
+        mock_pw.return_value = mock_context
+        mock_pw_instance = MagicMock()
+        mock_context.start.return_value = mock_pw_instance
+        mock_browser = MagicMock()
+        mock_page = MagicMock()
+        mock_pw_instance.chromium.launch.return_value = mock_browser
+        mock_browser.new_page.return_value = mock_page
+
+        bm = BrowserManager()
+        page = bm.launch(headless=True)
+
+        assert page is mock_page
+        assert bm.engine == "playwright"
+        mock_pw_instance.chromium.launch.assert_called_once_with(headless=True, slow_mo=500)
+
+    def test_get_page_before_launch(self):
+        """Should raise RuntimeError if get_page called before launch."""
+        bm = BrowserManager()
+        with pytest.raises(RuntimeError, match="尚未启动"):
+            bm.get_page()
+
+    @patch("src.core.browser_manager.sync_playwright")
+    def test_close(self, mock_pw):
+        """Should close browser and stop playwright."""
+        mock_context = MagicMock()
+        mock_pw.return_value = mock_context
+        mock_pw_instance = MagicMock()
+        mock_context.start.return_value = mock_pw_instance
+        mock_browser = MagicMock()
+        mock_pw_instance.chromium.launch.return_value = mock_browser
+        mock_browser.new_page.return_value = MagicMock()
+
+        bm = BrowserManager()
+        bm.launch(headless=True)
+        bm.close()
+
+        mock_browser.close.assert_called_once()
+        mock_pw_instance.stop.assert_called_once()
+
+    @patch("src.core.browser_manager.sync_playwright")
+    def test_is_alive(self, mock_pw):
+        """Should report alive after launch, dead after close."""
+        mock_context = MagicMock()
+        mock_pw.return_value = mock_context
+        mock_pw_instance = MagicMock()
+        mock_context.start.return_value = mock_pw_instance
+        mock_browser = MagicMock()
+        mock_pw_instance.chromium.launch.return_value = mock_browser
+        mock_browser.new_page.return_value = MagicMock()
+
+        bm = BrowserManager()
+        assert bm.is_alive() is False
+
+        bm.launch(headless=True)
+        assert bm.is_alive() is True
+
+        bm.close()
+        assert bm.is_alive() is False
+
+
+# ---------------------------------------------------------------------------
+# BrowserManager — CloakBrowser engine
+# ---------------------------------------------------------------------------
+
+
+class TestBrowserManagerCloak:
+    """Tests for BrowserManager with CloakBrowser engine."""
+
+    def setup_method(self):
+        reset_browser_manager()
+
+    def teardown_method(self):
+        reset_browser_manager()
+
+    @patch.dict("os.environ", {"USE_CLOAKBROWSER": "true"})
+    @patch("src.core.browser_manager._import_cloakbrowser")
+    def test_launch_cloakbrowser(self, mock_import):
+        """Should launch via CloakBrowser when enabled."""
+        mock_cloak = MagicMock()
+        mock_import.return_value = mock_cloak
+        mock_browser = MagicMock()
+        mock_page = MagicMock()
+        mock_cloak.launch.return_value = mock_browser
+        mock_browser.new_page.return_value = mock_page
+
+        bm = BrowserManager()
+        page = bm.launch(headless=False, humanize=True)
+
+        assert page is mock_page
+        assert bm.engine == "cloakbrowser"
+        mock_cloak.launch.assert_called_once_with(headless=False, humanize=True)
+
+    @patch.dict("os.environ", {"USE_CLOAKBROWSER": "true"})
+    @patch("src.core.browser_manager._import_cloakbrowser")
+    def test_launch_cloakbrowser_with_proxy(self, mock_import):
+        """Should pass proxy to CloakBrowser."""
+        mock_cloak = MagicMock()
+        mock_import.return_value = mock_cloak
+        mock_browser = MagicMock()
+        mock_cloak.launch.return_value = mock_browser
+        mock_browser.new_page.return_value = MagicMock()
+
+        bm = BrowserManager()
+        bm.launch(proxy="http://user:pass@host:port")
+
+        mock_cloak.launch.assert_called_once_with(
+            headless=False,
+            proxy="http://user:pass@host:port",
+        )
+
+    @patch.dict("os.environ", {"USE_CLOAKBROWSER": "true"})
+    def test_launch_cloakbrowser_not_installed(self):
+        """Should raise ImportError when cloakbrowser is not installed."""
+        bm = BrowserManager()
+        with pytest.raises(ImportError, match="未安装"):
+            bm.launch()
+
+    @patch.dict("os.environ", {"USE_CLOAKBROWSER": "true"})
+    @patch("src.core.browser_manager._import_cloakbrowser")
+    def test_close_cloak_no_playwright_stop(self, mock_import):
+        """Should NOT call playwright.stop() when using CloakBrowser."""
+        mock_cloak = MagicMock()
+        mock_import.return_value = mock_cloak
+        mock_browser = MagicMock()
+        mock_cloak.launch.return_value = mock_browser
+        mock_browser.new_page.return_value = MagicMock()
+
+        bm = BrowserManager()
+        bm.launch()
+        bm.close()
+
+        mock_browser.close.assert_called_once()
+        # _playwright should remain None — never started
+        assert bm._playwright is None
+
+
+# ---------------------------------------------------------------------------
+# Singleton
+# ---------------------------------------------------------------------------
+
+
+class TestSingleton:
+    """Tests for get_browser_manager / reset_browser_manager."""
+
+    def teardown_method(self):
+        reset_browser_manager()
+
+    def test_singleton_returns_same_instance(self):
+        """Should return the same BrowserManager instance."""
+        bm1 = get_browser_manager()
+        bm2 = get_browser_manager()
+        assert bm1 is bm2
+
+    def test_reset_creates_new_instance(self):
+        """Should create a new instance after reset."""
+        bm1 = get_browser_manager()
+        reset_browser_manager()
+        bm2 = get_browser_manager()
+        assert bm1 is not bm2

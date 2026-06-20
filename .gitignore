@@ -16,3 +16,4 @@ logs/
 node_modules/
 .pytest_cache/
 .mypy_cache/
+site/

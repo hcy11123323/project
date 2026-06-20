@@ -4,19 +4,29 @@ Agentic Playwright MCP Server -- main entry point.
 Registers browser-automation tools via FastMCP and exposes them to MCP
 clients (e.g. Claude Desktop).  All tools return synchronously using
 Playwright's sync_api.
+
+工具分为两类:
+1. 脚本工具（新增）: browse_skills, get_skill, write_script, run_script, analyze_page
+2. 基础工具（保留）: ping, browser_launch, screenshot
 """
 
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
 from src.core.browser_manager import get_browser_manager
-from src.layer_1.actions import do_goto, do_click, do_screenshot
+from src.core.script_engine import ScriptResult, get_script_engine
+from src.layer_2.controls import get_controls_exports
 from src.layer_3.domain_loader import load_domain, get_element_selectors
 from src.layer_3.config_updater import update_selector_priority
+from src.logging import get_logger, log_mcp_tool, log_timing
+
+# Module logger
+logger = get_logger(__name__)
 
 # ---------------------------------------------------------------------------
 # MCP Server instance
@@ -27,15 +37,28 @@ mcp = FastMCP(
 )
 
 # ---------------------------------------------------------------------------
-# Project path constants (for locating the domains/ directory)
+# Project path constants
 # ---------------------------------------------------------------------------
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _DOMAINS_DIR = str(_PROJECT_ROOT / "domains")
+_LIBRARY_DIR = str(_PROJECT_ROOT / "src" / "skill_library")
 
 
 # ---------------------------------------------------------------------------
-# Tool registration
+# 初始化脚本引擎（注入控件层函数）
+# ---------------------------------------------------------------------------
+
+
+def _init_script_engine():
+    """初始化脚本引擎，注入控件层函数。"""
+    engine = get_script_engine()
+    engine.register_functions(get_controls_exports())
+    return engine
+
+
+# ---------------------------------------------------------------------------
+# 基础工具（保留）
 # ---------------------------------------------------------------------------
 
 
@@ -55,103 +78,20 @@ def browser_launch() -> str:
     bm = get_browser_manager()
 
     if bm.is_alive():
+        logger.debug("Browser already running, skipping launch")
         return "Browser is already running."
 
     try:
         headless = os.getenv("BROWSER_HEADLESS", "false").lower() == "true"
-        page = bm.launch(headless=headless)
-        url = page.url
-        return f"Browser launched successfully. Current page: {url}"
+        with log_timing("browser_launch", headless=headless) as meta:
+            page = bm.launch(headless=headless)
+            meta["engine"] = bm.engine
+            meta["url"] = page.url
+        log_mcp_tool("browser_launch", success=True, engine=bm.engine)
+        return f"Browser launched successfully. Current page: {page.url}"
     except Exception as exc:
+        log_mcp_tool("browser_launch", success=False, error=str(exc))
         return f"Browser launch failed: {exc}"
-
-
-@mcp.tool()
-def navigate(url: str) -> str:
-    """Navigate to the given URL.
-
-    Args:
-        url: Target web address.
-
-    Returns:
-        A description of the navigation result.
-    """
-    bm = get_browser_manager()
-    try:
-        page = bm.get_page()
-    except RuntimeError:
-        return "Browser not launched. Call browser_launch first."
-
-    return do_goto(page, url)
-
-
-@mcp.tool()
-def smart_click(element_name: str, domain: str = "default") -> str:
-    """Smart click: locate an element via domain config and click it.
-
-    Loads domains/{domain}.yaml, extracts the selector list for
-    *element_name*, and tries each selector in priority order.  If a
-    fallback selector succeeds (index > 0), the YAML is automatically
-    updated to promote that selector (self-healing mechanism).
-
-    Args:
-        element_name: Key in the YAML 'locators' dict, e.g. 'search_button'.
-        domain: Domain config filename (without .yaml extension).
-
-    Returns:
-        A description of the click outcome.
-    """
-    bm = get_browser_manager()
-    try:
-        page = bm.get_page()
-    except RuntimeError:
-        return "Browser not launched. Call browser_launch first."
-
-    # 1. Load domain config and extract selector list
-    try:
-        domain_config = load_domain(domain, domains_dir=_DOMAINS_DIR)
-    except FileNotFoundError as exc:
-        return f"Domain config load failed: {exc}"
-    except Exception as exc:
-        return f"Domain config parse error: {exc}"
-
-    try:
-        selector_list = get_element_selectors(domain_config, element_name)
-    except ValueError as exc:
-        return str(exc)
-
-    if not selector_list:
-        return f"Selector list for element '{element_name}' is empty."
-
-    # 2. Execute click
-    result = do_click(page, selector_list)
-
-    if not result.get("success"):
-        return f"Click failed: {result.get('error', 'unknown error')}"
-
-    used_selector = result["used_selector"]
-    index = result["index"]
-
-    # 3. Self-heal: promote the selector if it was a fallback
-    if index > 0:
-        updated = update_selector_priority(
-            domain_name=domain,
-            element_name=element_name,
-            successful_selector=used_selector,
-            domains_dir=_DOMAINS_DIR,
-        )
-        heal_msg = (
-            " (selector priority auto-updated)"
-            if updated
-            else " (priority update failed)"
-        )
-    else:
-        heal_msg = ""
-
-    return (
-        f"Click succeeded: element='{element_name}', "
-        f"selector='{used_selector}' (index={index}){heal_msg}"
-    )
 
 
 @mcp.tool()
@@ -171,6 +111,7 @@ def screenshot(path: str) -> str:
         return "Browser not launched. Call browser_launch first."
 
     try:
+        from src.layer_1.actions import do_screenshot
         saved = do_screenshot(page, path)
         return f"Screenshot saved: {saved}"
     except Exception as exc:
@@ -178,12 +119,261 @@ def screenshot(path: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Entry point
+# 脚本工具（新增）
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def browse_skills(query: str = "", url: str = "") -> str:
+    """Browse the skill library and find matching skills.
+
+    Search by keywords or URL pattern. Returns a list of matching skills
+    with their IDs, names, types, and descriptions.
+
+    Args:
+        query: Search keywords (e.g. "百度 搜索", "登录", "分页").
+        url: URL to match against skill URL patterns.
+
+    Returns:
+        Formatted list of matching skills.
+    """
+    from src.skill_library.registry import get_skill_registry
+
+    registry = get_skill_registry(library_dir=_LIBRARY_DIR)
+
+    if not query and not url:
+        # 列出所有技能
+        skills = registry.list_all()
+    else:
+        skills = registry.search(query=query or None, url=url or None)
+
+    if not skills:
+        return "No matching skills found."
+
+    lines = ["Found skills:\n"]
+    for skill in skills:
+        lines.append(f"  [{skill.id}] {skill.name} ({skill.type})")
+        lines.append(f"    {skill.description}")
+        if skill.triggers:
+            lines.append(f"    Keywords: {', '.join(skill.triggers)}")
+        if skill.url_patterns:
+            lines.append(f"    URL patterns: {', '.join(skill.url_patterns)}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def get_skill(skill_id: str) -> str:
+    """Get the source code and guide for a specific skill.
+
+    Args:
+        skill_id: The skill ID (e.g. "domain/baidu_search", "interaction/login_flow").
+
+    Returns:
+        The skill's source code and optional guide document.
+    """
+    from src.skill_library.registry import get_skill_registry
+
+    registry = get_skill_registry(library_dir=_LIBRARY_DIR)
+    detail = registry.get_detail(skill_id)
+
+    if detail is None:
+        return f"Skill '{skill_id}' not found."
+
+    parts = [f"=== Skill: {detail.meta.name} ==="]
+    parts.append(f"Type: {detail.meta.type}")
+    parts.append(f"Description: {detail.meta.description}")
+    parts.append("")
+
+    if detail.source_code:
+        parts.append("--- Source Code ---")
+        parts.append(detail.source_code)
+        parts.append("")
+
+    if detail.guide:
+        parts.append("--- Guide ---")
+        parts.append(detail.guide)
+
+    return "\n".join(parts)
+
+
+@mcp.tool()
+def run_script(code: str) -> str:
+    """Execute a Python script in the sandboxed environment.
+
+    The script can use these built-in functions:
+    - Navigation: goto(url), go_back(), go_forward(), reload()
+    - Element ops: click(selector, ...), fill(selector, value, ...),
+                  smart_click(element, domain), smart_fill(element, value, domain)
+    - Composite: smart_login(domain, user, pass), smart_search(domain, keyword),
+                 smart_fill_form(domain, {field: value})
+    - Wait: wait_for_navigation(timeout), wait_for_element(selector, timeout), wait(sec)
+    - Info: get_url(), get_title(), get_text(), screenshot(path)
+    - Output: print(...), log(...)
+
+    Args:
+        code: Python script source code to execute.
+
+    Returns:
+        Execution result with output, error info, and screenshot paths.
+    """
+    bm = get_browser_manager()
+    if not bm.is_alive():
+        logger.error("run_script called but browser not launched")
+        return "Error: Browser not launched. Call browser_launch first."
+
+    engine = _init_script_engine()
+
+    with log_timing("script_execution") as meta:
+        result = engine.execute(code)
+        meta["success"] = result.success
+        meta["has_output"] = bool(result.output)
+        meta["has_error"] = bool(result.error)
+        meta["screenshot_count"] = len(result.screenshots) if result.screenshots else 0
+
+    log_mcp_tool("run_script", success=result.success)
+
+    parts = []
+    if result.success:
+        parts.append("Script executed successfully.")
+    else:
+        parts.append("Script execution failed.")
+
+    if result.output:
+        parts.append(f"\nOutput:\n{result.output}")
+
+    if result.error:
+        parts.append(f"\nError:\n{result.error}")
+
+    if result.screenshots:
+        parts.append(f"\nScreenshots: {', '.join(result.screenshots)}")
+
+    return "\n".join(parts)
+
+
+@mcp.tool()
+def analyze_page(question: str = "") -> str:
+    """Take a screenshot and analyze the page with a multimodal LLM.
+
+    Uses Claude Vision or GPT-4V to understand page content, identify
+    interactive elements, and suggest next actions.
+
+    Requires ANTHROPIC_API_KEY or OPENAI_API_KEY environment variable.
+
+    Args:
+        question: Optional specific question about the page
+                  (e.g. "Where is the login button?").
+
+    Returns:
+        Page analysis with summary, elements, and suggested actions.
+    """
+    bm = get_browser_manager()
+    if not bm.is_alive():
+        return "Error: Browser not launched. Call browser_launch first."
+
+    try:
+        from src.core.vision import get_vision_module
+        vision = get_vision_module()
+    except ValueError as exc:
+        return f"Vision module error: {exc}"
+    except ImportError as exc:
+        return f"Vision module error: {exc}"
+
+    try:
+        analysis = vision.analyze_page(question=question or None)
+    except Exception as exc:
+        return f"Page analysis failed: {exc}"
+
+    parts = [f"Page Analysis:\n{analysis.summary}"]
+
+    if analysis.elements:
+        parts.append("\nInteractive Elements:")
+        for i, elem in enumerate(analysis.elements, 1):
+            parts.append(
+                f"  {i}. {elem.description} "
+                f"@ ({elem.x}, {elem.y}) "
+                f"selector='{elem.suggested_selector}' "
+                f"confidence={elem.confidence}"
+            )
+
+    if analysis.suggested_actions:
+        parts.append("\nSuggested Actions:")
+        for action in analysis.suggested_actions:
+            parts.append(f"  - {action}")
+
+    return "\n".join(parts)
+
+
+@mcp.tool()
+def run_task(task: str, max_steps: int = 10) -> str:
+    """Execute a natural language task using the autonomous Agent loop.
+
+    The Agent will automatically:
+    1. Observe the current page (screenshot + analysis)
+    2. Plan the next action (check skill library or generate script)
+    3. Execute the script
+    4. Repeat until task complete or max steps reached
+
+    Failure recovery:
+    - Script fails → self-healing (selector fallback)
+    - All selectors fail → vision fallback (use coordinates)
+    - Vision fallback fails → record experience, try other approach
+
+    Args:
+        task: Natural language task description,
+              e.g. "帮我在百度搜索 Python 教程"
+        max_steps: Maximum execution steps (default 10).
+
+    Returns:
+        Execution result with step-by-step progress and final output.
+    """
+    bm = get_browser_manager()
+    if not bm.is_alive():
+        return "Error: Browser not launched. Call browser_launch first."
+
+    try:
+        from src.core.agent_loop import run_task as _run_task
+        result = _run_task(task, max_steps=max_steps)
+    except Exception as exc:
+        return f"Agent loop error: {exc}"
+
+    parts = []
+    if result.success:
+        parts.append(f"Task completed: {task}")
+    else:
+        parts.append(f"Task failed: {task}")
+
+    if result.steps:
+        parts.append("\nExecution steps:")
+        for step in result.steps:
+            status = "✓" if step.success else "✗"
+            parts.append(f"  {status} Step {step.step_number} [{step.state}]: {step.result}")
+
+    if result.output:
+        parts.append(f"\nOutput:\n{result.output}")
+
+    if result.final_url:
+        parts.append(f"\nFinal URL: {result.final_url}")
+
+    if result.error:
+        parts.append(f"\nError: {result.error}")
+
+    return "\n".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# 入口
 # ---------------------------------------------------------------------------
 
 
 def main() -> None:
-    """Start the MCP stdio transport."""
+    """Start the MCP stdio transport.
+
+    Note: The canonical entry point is now ``agentic-playwright-mcp serve``
+    via src.cli.  This function is kept for backward compatibility with
+    ``python -m src.server``.
+    """
     mcp.run(transport="stdio")
 
 

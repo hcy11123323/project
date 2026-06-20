@@ -1,0 +1,42 @@
+id: baidu_search
+name: 百度搜索
+type: domain
+description: 在百度首页搜索指定关键词
+version: "1.0.0"
+
+triggers:
+  - 百度
+  - 搜索
+  - baidu
+  - search
+
+url_patterns:
+  - "*.baidu.com"
+
+domain: baidu
+
+parameters:
+  keyword:
+    type: string
+    required: true
+    description: 搜索关键词
+
+steps:
+  - action: goto
+    args:
+      url: "https://www.baidu.com"
+    comment: 导航到百度首页
+
+  - action: smart_fill
+    target: search_input
+    value: "{{keyword}}"
+    comment: 在搜索框中输入关键词
+
+  - action: smart_click
+    target: search_button
+    comment: 点击搜索按钮
+
+  - action: wait_for_navigation
+    args:
+      timeout: 10
+    comment: 等待搜索结果页加载

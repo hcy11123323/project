@@ -12,6 +12,16 @@ from typing import List
 
 from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError
 
+from src.core.event_bus import (
+    EVENT_CLICK,
+    EVENT_FILL,
+    EVENT_GOTO,
+    EVENT_SCREENSHOT,
+    Event,
+    Phase,
+    get_event_bus,
+)
+
 
 def do_goto(page: Page, url: str) -> str:
     """导航到指定 URL。
@@ -23,14 +33,36 @@ def do_goto(page: Page, url: str) -> str:
     Returns:
         描述导航结果的状态字符串。
     """
+    bus = get_event_bus()
+    event = Event(
+        name=EVENT_GOTO,
+        phase=Phase.BEFORE,
+        data={"url": url, "page_url": page.url},
+    )
+    bus.emit(event)
+    if event.cancelled:
+        return f"导航已取消: {event.metadata.get('cancel_reason', '')}"
+
+    # Allow hooks to modify the URL
+    url = event.data.get("url", url)
+
     try:
         response = page.goto(url, wait_until="domcontentloaded")
         status = response.status if response else "unknown"
-        return f"导航成功: {url} (HTTP {status})"
+        result = f"导航成功: {url} (HTTP {status})"
     except PlaywrightTimeoutError:
-        return f"导航超时: {url}"
+        result = f"导航超时: {url}"
     except Exception as exc:
-        return f"导航失败: {url} — {exc}"
+        result = f"导航失败: {url} — {exc}"
+
+    after_event = Event(
+        name=EVENT_GOTO,
+        phase=Phase.AFTER,
+        data={"url": url, "page_url": page.url},
+        result=result,
+    )
+    bus.emit(after_event)
+    return result
 
 
 def do_click(
@@ -54,15 +86,35 @@ def do_click(
         dict: 成功时含 success, used_selector, index；
               失败时含 success, error, screenshot。
     """
+    bus = get_event_bus()
+    event = Event(
+        name=EVENT_CLICK,
+        phase=Phase.BEFORE,
+        data={"selector_list": list(selector_list), "timeout": timeout, "page_url": page.url},
+    )
+    bus.emit(event)
+    if event.cancelled:
+        return {"success": False, "error": f"点击已取消: {event.metadata.get('cancel_reason', '')}"}
+
+    # Allow hooks to modify selector list
+    selector_list = event.data.get("selector_list", selector_list)
+
     for i, selector in enumerate(selector_list):
         try:
             if page.is_visible(selector, timeout=1000):
                 page.click(selector, timeout=timeout)
-                return {
+                result = {
                     "success": True,
                     "used_selector": selector,
                     "index": i,
                 }
+                bus.emit(Event(
+                    name=EVENT_CLICK,
+                    phase=Phase.AFTER,
+                    data={"selector_list": list(selector_list), "page_url": page.url},
+                    result=result,
+                ))
+                return result
         except PlaywrightTimeoutError:
             continue
         except Exception:
@@ -70,11 +122,18 @@ def do_click(
 
     # 所有选择器均失败 — 截屏留证
     screenshot_path = _save_error_screenshot(page, "click")
-    return {
+    result = {
         "success": False,
         "error": f"所有选择器均不可用: {selector_list}",
         "screenshot": screenshot_path,
     }
+    bus.emit(Event(
+        name=EVENT_CLICK,
+        phase=Phase.AFTER,
+        data={"selector_list": list(selector_list), "page_url": page.url},
+        result=result,
+    ))
+    return result
 
 
 def do_fill(
@@ -98,26 +157,54 @@ def do_fill(
         dict: 成功时含 success, used_selector, index；
               失败时含 success, error, screenshot。
     """
+    bus = get_event_bus()
+    event = Event(
+        name=EVENT_FILL,
+        phase=Phase.BEFORE,
+        data={"selector_list": list(selector_list), "value": value, "timeout": timeout, "page_url": page.url},
+    )
+    bus.emit(event)
+    if event.cancelled:
+        return {"success": False, "error": f"填充已取消: {event.metadata.get('cancel_reason', '')}"}
+
+    # Allow hooks to modify selector list and value
+    selector_list = event.data.get("selector_list", selector_list)
+    value = event.data.get("value", value)
+
     for i, selector in enumerate(selector_list):
         try:
             if page.is_visible(selector, timeout=1000):
                 page.fill(selector, value, timeout=timeout)
-                return {
+                result = {
                     "success": True,
                     "used_selector": selector,
                     "index": i,
                 }
+                bus.emit(Event(
+                    name=EVENT_FILL,
+                    phase=Phase.AFTER,
+                    data={"selector_list": list(selector_list), "value": value, "page_url": page.url},
+                    result=result,
+                ))
+                return result
         except PlaywrightTimeoutError:
             continue
         except Exception:
             continue
 
     screenshot_path = _save_error_screenshot(page, "fill")
-    return {
+    result = {
         "success": False,
         "error": f"所有选择器均不可用: {selector_list}",
         "screenshot": screenshot_path,
     }
+    bus.emit(Event(
+        name=EVENT_FILL,
+        phase=Phase.AFTER,
+        data={"selector_list": list(selector_list), "value": value, "page_url": page.url},
+        result=result,
+    ))
+    return result
 
 
 def do_screenshot(page: Page, path: str) -> str:
@@ -132,8 +219,28 @@ def do_screenshot(page: Page, path: str) -> str:
     Returns:
         实际保存的文件路径。
     """
+    bus = get_event_bus()
+    event = Event(
+        name=EVENT_SCREENSHOT,
+        phase=Phase.BEFORE,
+        data={"path": path, "page_url": page.url},
+    )
+    bus.emit(event)
+    if event.cancelled:
+        return f"截图已取消: {event.metadata.get('cancel_reason', '')}"
+
+    # Allow hooks to modify the path
+    path = event.data.get("path", path)
+
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     page.screenshot(path=path, full_page=True)
+
+    bus.emit(Event(
+        name=EVENT_SCREENSHOT,
+        phase=Phase.AFTER,
+        data={"path": path, "page_url": page.url},
+        result=path,
+    ))
     return path
 
 

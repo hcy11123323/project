@@ -1,101 +1,262 @@
 # Agentic Playwright MCP
 
-轻量级桌面自动化底座 —— 基于 Playwright 的 MCP Server，通过三层进化架构为 AI Agent 提供浏览器操控能力。
+让 AI Agent 写 Python 脚本来控制浏览器的 MCP Server。
 
-## 三层架构
+基于 Playwright，支持可选的 [CloakBrowser](https://github.com/CloakHQ/CloakBrowser) 反检测引擎。
+
+## 核心理念
+
+**AI 不是逐个调用工具，而是编写 Python 脚本。**
 
 ```
-Layer 3: Domains (站点经验)     ← domains/*.yaml，选择器数据化 + 自愈写回
-Layer 2: Skills  (肌肉记忆)     ← 可复用操作序列（预留）
-Layer 1: Helpers (原语)          ← 单步原子操作：点击、输入、截图…
+用户意图 → AI 查找技能 → AI 参考范例生成脚本 → 脚本引擎执行 → 浏览器操作
+   ↳ 若未命中 → 检索通用模板 → 生成临时脚本 → 沙箱执行
+   ↳ 若失败 → 自愈机制尝试 → 视觉 fallback → 记录新经验
 ```
 
-| 层级 | 职责 | 当前状态 |
-|------|------|----------|
-| **Layer 1 — Helpers** | 单步原语：`navigate`, `smart_click`, `screenshot` 等 | 已实现 |
-| **Layer 2 — Skills** | 将多个原语编排为可复用序列 | 预留接口 |
-| **Layer 3 — Domains** | 加载站点 YAML 配置；选择器失败时自动提升优先级 | 已实现 |
+## 架构
 
-## 安装
+```
+┌─────────────────────────────────────────────────────────┐
+│              MCP Tools (8 个入口)                         │
+│  run_task │ browse_skills │ get_skill │ run_script │ ... │
+└──────┬──────────┬──────────┬────────────┬───────────────┘
+       │          │          │            │
+       ▼          ▼          ▼            ▼
+  ┌─────────┐ ┌────────┐ ┌──────────┐ ┌────────┐
+  │  Skill  │ │ Script │ │  Agent   │ │ Vision │
+  │ Library │ │ Engine │ │  Loop    │ │ Module │
+  └─────────┘ └────────┘ └────┬─────┘ └────────┘
+                              │
+                  ┌───────────┼───────────┐
+                  ▼           ▼           ▼
+            ┌──────────┐ ┌────────┐ ┌─────────┐
+            │ Controls │ │ Layer1 │ │ Layer3  │
+            │ (控件层)  │ │ (原语层)│ │ (域配置) │
+            └──────────┘ └────────┘ └─────────┘
+                  │           │           │
+                  ▼           ▼           ▼
+            ┌─────────────────────────────────┐
+            │     Playwright / CloakBrowser    │
+            └─────────────────────────────────┘
+```
+
+| 层级 | 职责 | 状态 |
+|------|------|------|
+| **Agent 循环** | OBSERVE→PLAN→ACT 自主执行 | ✅ |
+| **脚本引擎** | 受限沙箱执行 AI 生成的 Python 脚本 | ✅ |
+| **控件层** | `smart_login`, `smart_search` 等 15 个高级函数 | ✅ |
+| **标准脚本库** | `.py` 范例 + `.md` 说明 + `skills.yaml` 索引 | ✅ |
+| **视觉模块** | 截图 + 多模态 LLM 理解页面 | ✅ |
+| **Layer 1 — 原语层** | `goto`, `click`, `fill`, `screenshot` | ✅ |
+| **Layer 3 — 域配置** | YAML 选择器 + 自愈写回 | ✅ |
+| **事件钩子** | EventBus + 7 种标准事件 | ✅ |
+| **插件系统** | SkillBase 抽象类 + skills.yaml 声明式配置 | ✅ |
+| **CLI** | `browser-agent serve/run/doctor` | ✅ |
+
+## MCP 工具列表（8 个）
+
+| 工具 | 说明 |
+|------|------|
+| `run_task` | 自然语言驱动的自主 Agent 循环 |
+| `browse_skills` | 按关键词或 URL 查找技能库 |
+| `get_skill` | 获取技能源码和说明文档 |
+| `run_script` | 在受限沙箱中执行 Python 脚本 |
+| `analyze_page` | 截图 + 多模态 LLM 分析页面（需 API Key） |
+| `browser_launch` | 启动 Chromium 浏览器 |
+| `screenshot` | 截取当前页面截图 |
+| `ping` | 健康检查 |
+
+## 快速开始
 
 ```bash
 # 1. 克隆仓库
 git clone <repo-url>
 cd agentic-playwright-mcp
 
-# 2. 安装项目（含依赖）
-pip install -e .
+# 2. 一键安装（依赖 + Playwright 浏览器）
+make dev
 
-# 3. 安装 Chromium 浏览器
-playwright install chromium
-```
-
-## 配置
-
-```bash
-# 复制环境变量模板
+# 3. 复制环境变量
 cp .env.example .env
 
-# 编辑 .env，填入 API Key（如需调用 LLM 视觉能力）
-# OPENAI_API_KEY=sk-xxx
+# 4. 启动
+make run
 ```
 
-## 启动
+## CLI 工具
 
 ```bash
-# 方式一：模块启动
-python -m src.server
+# 启动 MCP 服务
+browser-agent serve
 
-# 方式二：CLI 入口
-agentic-playwright-mcp
+# 单次执行任务（调试用）
+browser-agent run "帮我在百度搜索 Python 教程" --max-steps 5
+
+# 无头模式
+browser-agent run "截图当前页面" --headless
+
+# 检查环境
+browser-agent doctor
 ```
 
-启动后，MCP Server 将在 **stdio** 上监听，等待客户端连接。
+## 插件化技能
 
-## MCP 工具列表
+添加新技能只需两步：
 
-| 工具名 | 说明 |
-|--------|------|
-| `ping` | 健康检查，返回 `pong` |
-| `browser_launch` | 启动 Chromium 浏览器实例 |
-| `navigate` | 导航到指定 URL |
-| `smart_click` | 通过 Domain YAML 中的选择器点击元素 |
-| `screenshot` | 截取当前页面截图 |
-
-## 在 Claude Desktop 中配置
-
-编辑 Claude Desktop 的 MCP 配置文件：
-
-```json
-{
-  "mcpServers": {
-    "agentic-playwright": {
-      "command": "python",
-      "args": ["-m", "src.server"],
-      "cwd": "/path/to/agentic-playwright-mcp"
-    }
-  }
-}
-```
-
-重启 Claude Desktop 后，上方工具列表将自动出现在 Claude 的可用工具中。
-
-## 选择器数据化示例
-
-所有选择器均存放在 `domains/*.yaml` 中，严禁在 Python 代码里硬编码：
+1. 在 `skills.yaml` 中声明元信息
+2. 在 `src/skill_library/domains/` 或 `interactions/` 中放置 `.py` 文件
 
 ```yaml
-name: baidu
-base_url: https://www.baidu.com
-locators:
-  search_input:
-    css:
-      - "#kw"
-      - "input[name='wd']"
-      - ".s_ipt"
-    xpath:
-      - "//input[@id='kw']"
-      - "//input[@name='wd']"
+# skills.yaml
+skills:
+  - id: my_site
+    name: 我的网站
+    type: domain
+    triggers: ["我的网站", "mysite"]
+    url_patterns: ["mysite.com"]
+    description: 我的网站适配器
 ```
 
-当某个选择器在运行时成功定位元素后，`config_updater` 会将其自动提升到列表首位，实现 **自愈** 效果。
+```python
+# src/skill_library/domains/my_site.py
+from src.skill_library.skill_base import SkillBase, SkillContext, SkillResult
+
+class MySiteSkill(SkillBase):
+    id = "my_site"
+    name = "我的网站"
+    type = "domain"
+    triggers = ["我的网站"]
+    url_patterns = ["mysite.com"]
+    description = "我的网站适配器"
+
+    def execute(self, page, context: SkillContext) -> SkillResult:
+        # 实现自动化逻辑
+        return SkillResult(success=True, output="完成")
+```
+
+## 使用示例
+
+### 在 Claude Desktop 中
+
+```
+用户: 帮我在百度搜索 Python 教程
+AI:   调用 run_task("帮我在百度搜索 Python 教程")
+      → Agent 自动: 截图→分析→查技能→执行→返回结果
+```
+
+### 脚本引擎可用函数
+
+```python
+# 导航
+goto("https://example.com")
+go_back()
+
+# 元素操作（支持多个备选选择器）
+click("#button", ".fallback-btn")
+fill("#input", "hello")
+
+# 域配置驱动（带自愈）
+smart_click("search_button", domain="baidu")
+smart_fill("search_input", "Python 教程", domain="baidu")
+
+# 组合操作
+smart_login("github", "user", "pass")
+smart_search("baidu", "Python 教程")
+smart_fill_form("example", {"name": "张三", "email": "test@test.com"})
+
+# 等待
+wait_for_navigation(timeout=10)
+wait_for_element("#result", timeout=10)
+wait(2.0)
+
+# 页面信息
+url = get_url()
+title = get_title()
+text = get_text()
+screenshot("page.png")
+```
+
+## CloakBrowser 反检测引擎
+
+```bash
+pip install -e ".[stealth]"
+USE_CLOAKBROWSER=true make run
+```
+
+| 检测服务 | Playwright | CloakBrowser |
+|---------|-----------|-------------|
+| reCAPTCHA v3 | 0.1 (bot) | **0.9** (human) |
+| Cloudflare Turnstile | FAIL | **PASS** |
+| FingerprintJS | DETECTED | **PASS** |
+
+## 文档
+
+```bash
+pip install -e ".[docs]"
+make docs        # 启动本地文档服务器
+make docs-build  # 构建静态文档
+```
+
+文档部署到 GitHub Pages：`make docs-deploy`
+
+## 项目结构
+
+```
+agentic-playwright-mcp/
+├── pyproject.toml                    # 项目配置 + 依赖
+├── .env.example                      # 环境变量模板
+├── Makefile                          # 快捷命令
+├── Dockerfile                        # 容器化部署
+├── mkdocs.yml                        # 文档配置
+├── .github/workflows/ci.yml         # CI
+│
+├── domains/                          # 站点选择器配置
+│   └── example_baidu.yaml
+│
+├── skills/                           # 声明式技能配置
+│   ├── baidu_search.yaml
+│   └── generic_login.yaml
+│
+├── src/
+│   ├── server.py                     # MCP 入口（8 个工具）
+│   ├── cli.py                        # CLI (serve/run/doctor)
+│   ├── config.py                     # 配置加载
+│   ├── logging.py                    # 结构化日志
+│   ├── core/
+│   │   ├── agent_loop.py             # Agent 循环引擎
+│   │   ├── script_engine.py          # 脚本执行引擎
+│   │   ├── browser_manager.py        # 双引擎浏览器管理
+│   │   ├── event_bus.py              # 事件钩子系统
+│   │   └── vision.py                 # 视觉模块
+│   ├── layer_1/actions.py            # 原子操作
+│   ├── layer_2/controls.py           # 高级控件函数
+│   ├── layer_3/                      # 域配置 + 自愈
+│   └── skill_library/                # 标准脚本库
+│       ├── skill_base.py             # SkillBase 抽象类
+│       ├── skills.yaml               # 声明式配置
+│       ├── registry.py               # 技能注册
+│       ├── domains/                  # 站点适配器
+│       ├── interactions/             # 通用模板
+│       └── guides/                   # 说明文档
+│
+├── tests/                            # 475 个测试，全部通过
+├── docs/                             # MkDocs 文档
+├── examples/                         # 示例脚本
+└── workflows/                        # Workflow 脚本
+```
+
+## 开发
+
+```bash
+make dev      # 安装依赖
+make test     # 跑测试（475 个）
+make lint     # 代码检查
+make format   # 自动修复
+make clean    # 清理缓存
+make docs     # 启动文档服务器
+```
+
+## License
+
+MIT
