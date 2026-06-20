@@ -17,3 +17,5 @@ node_modules/
 .pytest_cache/
 .mypy_cache/
 site/
+.ruff_cache/
+workflows/
