@@ -460,18 +460,25 @@ class AgentLoop:
         技能源码通常只定义函数（如 def run(keyword)），需要追加调用语句。
         从任务描述中提取参数，自动调用函数。
         """
+        import re
+
         # 提取关键词
         keyword = self._script_generator._extract_keyword(task)
         if not keyword:
             keyword = task  # 降级：用整个任务描述作为关键词
 
-        # 检查源码是否已经包含调用语句（不是只定义函数）
-        if "run(" in source_code and "def run" not in source_code.split("run(")[-1][:20]:
+        # 转义引号
+        keyword_escaped = keyword.replace('"', '\\"')
+
+        # 检查源码是否已经有独立的 run() 调用（不是 def run 定义）
+        # 去掉 def 语句后，检查是否还有 run( 调用
+        code_without_defs = re.sub(r'def\s+\w+\s*\([^)]*\)\s*:', '', source_code)
+        if 'run(' in code_without_defs:
             # 已经有调用语句，直接返回
             return source_code
 
         # 追加调用语句
-        call_script = f'{source_code}\n\n# 自动调用\nrun("{keyword}")'
+        call_script = f'{source_code}\n\n# 自动调用\nrun("{keyword_escaped}")'
         return call_script
 
     # -------------------------------------------------------------------

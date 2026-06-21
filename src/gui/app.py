@@ -526,7 +526,11 @@ def api_run():
         else:
             os.environ["USE_CLOAKBROWSER"] = "false"
 
-        # 启动浏览器
+        # 重置状态，确保干净的执行环境
+        from src.core.script_engine import reset_script_engine
+        reset_script_engine()
+
+        # 启动浏览器（如果未启动）
         bm = get_browser_manager()
         if not bm.is_alive():
             bm.launch(headless=headless)
