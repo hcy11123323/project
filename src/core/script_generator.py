@@ -35,7 +35,7 @@ class TaskIntent:
 class ScriptGenerator:
     """根据任务描述生成 Python 脚本。"""
 
-    # 搜索引擎配置
+    # 搜索引擎/网站配置
     SEARCH_ENGINES = {
         "baidu": {
             "url": "https://www.baidu.com",
@@ -50,10 +50,106 @@ class ScriptGenerator:
             "name": "Google",
         },
         "bing": {
-            "url": "https://www.bing.com",
+            "url": "https://cn.bing.com",
             "input": "#sb_form_q",
             "submit": "#sb_form_go",
-            "name": "Bing",
+            "name": "必应",
+        },
+        "sogou": {
+            "url": "https://www.sogou.com",
+            "input": "#query",
+            "submit": "#stb",
+            "name": "搜狗",
+        },
+        "so": {
+            "url": "https://www.so.com",
+            "input": "#input",
+            "submit": "#search-button",
+            "name": "360搜索",
+        },
+        "dangdang": {
+            "url": "https://www.dangdang.com",
+            "input": "#key_S",
+            "submit": ".button",
+            "name": "当当",
+        },
+        "csdn": {
+            "url": "https://so.csdn.net/so/search?q=",
+            "input": "#toolbar-search-input",
+            "submit": ".toolbar-search-btn",
+            "name": "CSDN",
+        },
+        "gitee": {
+            "url": "https://search.gitee.com/?type=repository&q=",
+            "input": "#search-input",
+            "submit": ".search-btn",
+            "name": "Gitee",
+        },
+        "baike": {
+            "url": "https://baike.baidu.com",
+            "input": "#query",
+            "submit": ".search-btn",
+            "name": "百度百科",
+        },
+        "toutiao": {
+            "url": "https://so.toutiao.com/search?keyword=",
+            "input": "input[placeholder*='搜索']",
+            "submit": ".search-btn",
+            "name": "今日头条",
+        },
+        "zhihu": {
+            "url": "https://www.zhihu.com/search",
+            "input": ".Input-wrapper input",
+            "submit": ".SearchBar-searchButton",
+            "name": "知乎",
+        },
+        "douban": {
+            "url": "https://www.douban.com",
+            "input": "#inp-query",
+            "submit": ".bn",
+            "name": "豆瓣",
+        },
+        "bilibili": {
+            "url": "https://search.bilibili.com/all?keyword=",
+            "input": ".nav-search-input",
+            "submit": ".nav-search-btn",
+            "name": "B站",
+        },
+        "weibo": {
+            "url": "https://s.weibo.com",
+            "input": "#search-input",
+            "submit": "[node-type='searchbtn']",
+            "name": "微博",
+        },
+        "wenku": {
+            "url": "https://wenku.baidu.com",
+            "input": "#search-input",
+            "submit": ".search-btn",
+            "name": "百度文库",
+        },
+        "taobao": {
+            "url": "https://www.taobao.com",
+            "input": "#q",
+            "submit": ".btn-search",
+            "name": "淘宝",
+        },
+        "jd": {
+            "url": "https://www.jd.com",
+            "input": "#key",
+            "submit": ".button",
+            "name": "京东",
+        },
+        "pdd": {
+            "url": "https://www.pinduoduo.com",
+            "input": "input[placeholder*='搜索']",
+            "submit": ".search-btn",
+            "name": "拼多多",
+        },
+        "weather": {
+            "url": "https://www.weather.com.cn",
+            "input": "#search_input",
+            "submit": ".search-btn",
+            "name": "天气网",
         },
     }
 
@@ -91,7 +187,7 @@ class ScriptGenerator:
             return TaskIntent(action="navigate", target=url)
 
         # 搜索任务
-        if any(kw in task_lower for kw in ["搜索", "search", "查找", "找", "查", "搜"]):
+        if any(kw in task_lower for kw in ["搜索", "search", "查找", "找", "查", "搜", "查询", "lookup"]):
             keyword = self._extract_keyword(task)
             engine = self._detect_search_engine(task)
             if keyword:
@@ -186,12 +282,21 @@ class ScriptGenerator:
 
     def _gen_search(self, keyword: str, engine: str) -> str:
         cfg = self.SEARCH_ENGINES.get(engine, self.SEARCH_ENGINES["baidu"])
+
+        # 某些网站支持 URL 直接搜索
+        url_search_engines = ["csdn", "gitee", "bilibili", "toutiao"]
+        if engine in url_search_engines:
+            return f'''goto("{cfg["url"]}{keyword}")
+wait_for_navigation()
+log("{cfg['name']}搜索完成: {keyword}")'''
+
+        # 表单搜索
         return f'''goto("{cfg["url"]}")
 wait_for_navigation()
 fill("{cfg["input"]}", "{keyword}")
 click("{cfg["submit"]}")
 wait_for_navigation()
-log("搜索完成: {keyword}")'''
+log("{cfg['name']}搜索完成: {keyword}")'''
 
     def _gen_extract(self) -> str:
         return '''text = get_text()
@@ -255,13 +360,12 @@ log("向上滚动")'''
 
     def _extract_keyword(self, task: str) -> str | None:
         """从任务描述中提取搜索关键词。"""
-        # 匹配 "在XXX搜索YYY" 或 "搜索YYY" 模式
+        # 匹配 "在XXX搜索/查询YYY" 模式
         patterns = [
-            r'(?:在|到)(?:百度|google|bing|谷歌|必应)?(?:上)?搜索[:\s]*(.+)',
-            r'(?:百度|google|bing)?搜索[:\s]*(.+)',
+            r'(?:在|到)(?:百度|google|bing|谷歌|必应|搜狗|360|当当|CSDN|Gitee|百科|头条|知乎|豆瓣|B站|微博|文库|淘宝|京东|拼多多|天气网)?(?:上)?(?:搜索|查询|查找)[:\s]*(.+)',
+            r'(?:百度|google|bing|搜狗|360|当当|CSDN|Gitee|百科|头条|知乎|豆瓣|B站|微博|文库|淘宝|京东|拼多多)?(?:搜索|查询|查找)[:\s]*(.+)',
+            r'(?:搜索|查询|查找)[:\s]*(.+)',
             r'search\s+(?:for\s+)?(.+)',
-            r'查找[:\s]*(.+)',
-            r'搜[:\s]*(.+)',
             r'找[:\s]*(.+)',
         ]
 
@@ -305,12 +409,44 @@ log("向上滚动")'''
         return None
 
     def _detect_search_engine(self, task: str) -> str:
-        """检测用户想用哪个搜索引擎。"""
+        """检测用户想用哪个搜索引擎/网站。"""
         task_lower = task.lower()
         if any(kw in task_lower for kw in ["google", "谷歌"]):
             return "google"
         if any(kw in task_lower for kw in ["bing", "必应"]):
             return "bing"
+        if any(kw in task_lower for kw in ["搜狗", "sogou"]):
+            return "sogou"
+        if any(kw in task_lower for kw in ["360", "so.com"]):
+            return "so"
+        if any(kw in task_lower for kw in ["当当", "dangdang"]):
+            return "dangdang"
+        if any(kw in task_lower for kw in ["csdn"]):
+            return "csdn"
+        if any(kw in task_lower for kw in ["gitee"]):
+            return "gitee"
+        if any(kw in task_lower for kw in ["百科", "baike"]):
+            return "baike"
+        if any(kw in task_lower for kw in ["头条", "toutiao"]):
+            return "toutiao"
+        if any(kw in task_lower for kw in ["知乎", "zhihu"]):
+            return "zhihu"
+        if any(kw in task_lower for kw in ["豆瓣", "douban"]):
+            return "douban"
+        if any(kw in task_lower for kw in ["b站", "bilibili", "哔哩"]):
+            return "bilibili"
+        if any(kw in task_lower for kw in ["微博", "weibo", "热搜"]):
+            return "weibo"
+        if any(kw in task_lower for kw in ["文库", "wenku"]):
+            return "wenku"
+        if any(kw in task_lower for kw in ["淘宝", "taobao"]):
+            return "taobao"
+        if any(kw in task_lower for kw in ["京东", "jd"]):
+            return "jd"
+        if any(kw in task_lower for kw in ["拼多多", "pdd"]):
+            return "pdd"
+        if any(kw in task_lower for kw in ["天气", "weather"]):
+            return "weather"
         return "baidu"  # 默认百度
 
     def _extract_number(self, task: str, default: int = 5) -> int:
