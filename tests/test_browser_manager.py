@@ -74,7 +74,7 @@ class TestBrowserManagerPlaywright:
         mock_browser = MagicMock()
         mock_page = MagicMock()
         mock_pw_instance.chromium.launch.return_value = mock_browser
-        mock_browser.new_page.return_value = mock_page
+        mock_browser.new_context.return_value.new_page.return_value = mock_page
 
         bm = BrowserManager()
         page = bm.launch(headless=True)
@@ -101,7 +101,7 @@ class TestBrowserManagerPlaywright:
         mock_context.start.return_value = mock_pw_instance
         mock_browser = MagicMock()
         mock_pw_instance.chromium.launch.return_value = mock_browser
-        mock_browser.new_page.return_value = MagicMock()
+        mock_browser.new_context.return_value.new_page.return_value = MagicMock()
 
         bm = BrowserManager()
         bm.launch(headless=True)
@@ -155,7 +155,7 @@ class TestBrowserManagerCloak:
         mock_browser = MagicMock()
         mock_page = MagicMock()
         mock_cloak.launch.return_value = mock_browser
-        mock_browser.new_page.return_value = mock_page
+        mock_browser.new_context.return_value.new_page.return_value = mock_page
 
         bm = BrowserManager()
         page = bm.launch(headless=False, humanize=True)
@@ -172,7 +172,7 @@ class TestBrowserManagerCloak:
         mock_import.return_value = mock_cloak
         mock_browser = MagicMock()
         mock_cloak.launch.return_value = mock_browser
-        mock_browser.new_page.return_value = MagicMock()
+        mock_browser.new_context.return_value.new_page.return_value = MagicMock()
 
         bm = BrowserManager()
         bm.launch(proxy="http://user:pass@host:port")

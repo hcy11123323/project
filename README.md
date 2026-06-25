@@ -140,7 +140,7 @@ with AgentLoop(headless=True) as agent:
 }
 ```
 
-## MCP 工具列表（8 个）
+## MCP 工具列表（12 个）
 
 | 工具 | 说明 |
 |------|------|
@@ -150,6 +150,10 @@ with AgentLoop(headless=True) as agent:
 | `run_script` | 在受限沙箱中执行 Python 脚本 |
 | `analyze_page` | 截图 + 多模态 LLM 分析页面 |
 | `browser_launch` | 启动 Chromium 浏览器 |
+| `browser_launch_with_domain` | 带站点 cookie 启动浏览器 |
+| `auth_list` | 列出所有站点的登录状态 |
+| `auth_save` | 保存当前站点的 cookie |
+| `auth_delete` | 删除某站点的 cookie |
 | `screenshot` | 截取当前页面截图 |
 | `ping` | 健康检查 |
 
@@ -169,9 +173,13 @@ smart_click("search_button", domain="baidu")
 smart_fill("search_input", "Python 教程", domain="baidu")
 
 # 组合操作
-smart_login("github", "user", "pass")
+smart_login("github", "user", "pass")  # 登录后自动保存 cookie
 smart_search("baidu", "Python 教程")
 smart_fill_form("example", {"name": "张三", "email": "test@test.com"})
+
+# Cookie 持久化
+save_cookies("baidu")        # 手动保存当前站点 cookie
+load_cookies("baidu")        # 加载已保存的 cookie（重建 context）
 
 # JavaScript 执行
 run_js('document.querySelector("#kw").value = "Python"')
@@ -216,6 +224,27 @@ USE_CLOAKBROWSER=true browser-agent gui
 | Cloudflare Turnstile | FAIL | **PASS** |
 | FingerprintJS | DETECTED | **PASS** |
 
+## Cookie 持久化
+
+支持按站点保存和恢复登录状态（cookie + localStorage），使用 Playwright 的 `storage_state` 机制。
+
+```bash
+# 启动时自动加载已保存的 cookie
+browser_launch_with_domain("baidu")
+
+# 登录后自动保存（smart_login 会自动触发）
+smart_login("github", "user", "pass")
+
+# 手动管理
+auth_list          # 查看所有站点的登录状态
+auth_save("baidu") # 手动保存
+auth_delete("baidu") # 删除
+```
+
+**存储位置**：`~/.agentic-playwright/auth/{domain}.json`
+
+**自动适配**：新增 `domains/*.yaml` 站点时，自动支持对应的 cookie 管理，无需额外配置。
+
 ## 项目结构
 
 ```
@@ -226,6 +255,7 @@ agentic-playwright-mcp/
 │   ├── sdk.py                     # Python SDK
 │   ├── core/
 │   │   ├── agent_loop.py          # Agent 循环引擎
+│   │   ├── auth_manager.py        # Cookie 持久化管理
 │   │   ├── script_engine.py       # 脚本执行引擎
 │   │   ├── script_generator.py    # 任务意图解析
 │   │   ├── experience.py          # 经验进化系统

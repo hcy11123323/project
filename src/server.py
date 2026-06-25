@@ -365,6 +365,104 @@ def run_task(task: str, max_steps: int = 10) -> str:
 
 
 # ---------------------------------------------------------------------------
+# 认证管理工具
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def auth_list() -> str:
+    """List all domains and their authentication status.
+
+    Scans the domains/ directory and shows which sites have saved cookies.
+
+    Returns:
+        Formatted list of domains with auth status.
+    """
+    from src.core.auth_manager import get_auth_manager
+
+    am = get_auth_manager()
+    domains = am.list_domains()
+    if not domains:
+        return "No domains found in domains/ directory."
+
+    lines = ["Domain authentication status:"]
+    for d in domains:
+        icon = "✓" if d["has_auth"] else "✗"
+        lines.append(f"  {icon} {d['domain']}")
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def auth_save(domain: str) -> str:
+    """Save current browser cookies for a domain.
+
+    Saves the current browser context's storage_state (cookies, localStorage)
+    to ~/.agentic-playwright/auth/{domain}.json.
+
+    Args:
+        domain: Domain name (matching domains/{domain}.yaml).
+
+    Returns:
+        Save result message.
+    """
+    bm = get_browser_manager()
+    if not bm.is_alive():
+        return "Error: Browser not launched. Call browser_launch first."
+
+    if bm._context is None:
+        return "Error: No active browser context."
+
+    from src.core.auth_manager import get_auth_manager
+
+    am = get_auth_manager()
+    path = am.save_auth(domain, bm._context)
+    return f"Auth saved for '{domain}': {path}"
+
+
+@mcp.tool()
+def auth_delete(domain: str) -> str:
+    """Delete saved cookies for a domain.
+
+    Args:
+        domain: Domain name.
+
+    Returns:
+        Delete result message.
+    """
+    from src.core.auth_manager import get_auth_manager
+
+    am = get_auth_manager()
+    if am.delete_auth(domain):
+        return f"Auth deleted for '{domain}'."
+    return f"No auth found for '{domain}'."
+
+
+@mcp.tool()
+def browser_launch_with_domain(domain: str) -> str:
+    """Launch browser with saved cookies for a domain.
+
+    If the browser is already running, creates a new context with the
+    domain's saved auth. If no saved auth exists, launches normally.
+
+    Args:
+        domain: Domain name (matching domains/{domain}.yaml).
+
+    Returns:
+        Launch result message.
+    """
+    bm = get_browser_manager()
+
+    try:
+        page = bm.launch_with_domain(domain=domain)
+        from src.core.auth_manager import get_auth_manager
+
+        has = "with saved auth" if get_auth_manager().has_auth(domain) else "no saved auth"
+        return f"Browser ready for '{domain}' ({has}). Current page: {page.url}"
+    except Exception as exc:
+        return f"Launch failed: {exc}"
+
+
+# ---------------------------------------------------------------------------
 # 入口
 # ---------------------------------------------------------------------------
 

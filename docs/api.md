@@ -11,6 +11,10 @@
 | [`run_script`](#run_script) | 在受限沙箱中执行 Python 脚本 | `script`: str, `timeout`: int |
 | [`analyze_page`](#analyze_page) | 截图 + 多模态 LLM 分析页面 | `prompt`: str, `model`: str |
 | [`browser_launch`](#browser_launch) | 启动 Chromium 浏览器 | `headless`: bool, `use_cloak`: bool |
+| [`browser_launch_with_domain`](#browser_launch_with_domain) | 带站点 cookie 启动浏览器 | `domain`: str |
+| [`auth_list`](#auth_list) | 列出所有站点的登录状态 | 无 |
+| [`auth_save`](#auth_save) | 保存当前站点的 cookie | `domain`: str |
+| [`auth_delete`](#auth_delete) | 删除某站点的 cookie | `domain`: str |
 | [`screenshot`](#screenshot) | 截取当前页面截图 | `name`: str |
 | [`ping`](#ping) | 健康检查 | 无 |
 
@@ -144,6 +148,10 @@ smart_fill(element: str, value: str, domain: str) -> None
 smart_login(domain: str, username: str, password: str, **kwargs) -> None
 smart_search(domain: str, query: str, **kwargs) -> None
 smart_fill_form(domain: str, data: dict, **kwargs) -> None
+
+# Cookie 持久化
+save_cookies(domain: str) -> str
+load_cookies(domain: str) -> str
 
 # 等待
 wait(seconds: float) -> None
@@ -299,6 +307,98 @@ result = await browser_launch(headless=True)
 
 ```bash
 pip install -e ".[stealth]"
+```
+
+---
+
+## browser_launch_with_domain
+
+启动浏览器并自动加载已保存的站点 cookie。如果浏览器已运行，会创建新的 context（不重启浏览器）。
+
+### 参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `domain` | `str` | 是 | 站点名（对应 `domains/{domain}.yaml`） |
+
+### 返回值
+
+```
+Browser ready for 'baidu' (with saved auth). Current page: https://www.baidu.com
+```
+
+### 示例
+
+```python
+# 带已保存的 cookie 启动
+result = await browser_launch_with_domain("baidu")
+
+# 如果没有保存过 cookie，等同于普通启动
+result = await browser_launch_with_domain("new_site")
+```
+
+---
+
+## auth_list
+
+列出所有站点及其登录状态。
+
+### 返回值
+
+```
+Domain authentication status:
+  ✓ baidu
+  ✗ github
+  ✓ google
+```
+
+### 示例
+
+```python
+result = await auth_list()
+```
+
+---
+
+## auth_save
+
+保存当前浏览器的 cookie / localStorage 到本地文件。
+
+### 参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `domain` | `str` | 是 | 站点名 |
+
+### 返回值
+
+```
+Auth saved for 'baidu': C:\Users\user\.agentic-playwright\auth\baidu.json
+```
+
+### 示例
+
+```python
+# 登录后手动保存
+await auth_save("github")
+```
+
+---
+
+## auth_delete
+
+删除某站点已保存的 cookie。
+
+### 参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `domain` | `str` | 是 | 站点名 |
+
+### 返回值
+
+```
+Auth deleted for 'github'.
 ```
 
 ---

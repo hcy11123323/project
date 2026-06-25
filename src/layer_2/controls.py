@@ -388,6 +388,18 @@ def smart_login(
     wait_result = wait_for_navigation()
     steps.append({"step": "wait_navigation", "result": wait_result})
 
+    # 6. 登录成功，自动保存 cookie
+    try:
+        from src.core.auth_manager import get_auth_manager
+
+        bm = get_browser_manager()
+        if bm._context is not None:
+            am = get_auth_manager()
+            am.save_auth(domain, bm._context)
+            steps.append({"step": "save_cookies", "result": f"已保存 {domain} 的登录状态"})
+    except Exception as exc:
+        steps.append({"step": "save_cookies", "result": f"保存失败: {exc}"})
+
     return {"success": True, "steps": steps}
 
 
@@ -584,6 +596,54 @@ def screenshot(path: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Cookie 持久化（供脚本引擎调用）
+# ---------------------------------------------------------------------------
+
+
+def save_cookies(domain: str) -> str:
+    """保存当前站点的 cookie / localStorage。
+
+    Args:
+        domain: 站点名（对应 domains/{domain}.yaml）。
+
+    Returns:
+        操作结果描述。
+    """
+    from src.core.auth_manager import get_auth_manager
+
+    bm = get_browser_manager()
+    if bm._context is None:
+        return "保存失败: 浏览器未启动"
+
+    am = get_auth_manager()
+    am.save_auth(domain, bm._context)
+    return f"已保存 {domain} 的登录状态"
+
+
+def load_cookies(domain: str) -> str:
+    """加载指定站点的 cookie / localStorage（需重启 context）。
+
+    Args:
+        domain: 站点名（对应 domains/{domain}.yaml）。
+
+    Returns:
+        操作结果描述。
+    """
+    from src.core.auth_manager import get_auth_manager
+
+    am = get_auth_manager()
+    if not am.has_auth(domain):
+        return f"未找到 {domain} 的登录状态"
+
+    bm = get_browser_manager()
+    if not bm.is_alive():
+        return "加载失败: 浏览器未启动"
+
+    bm.launch_with_domain(domain)
+    return f"已加载 {domain} 的登录状态"
+
+
+# ---------------------------------------------------------------------------
 # 导出函数列表（供脚本引擎注入）
 # ---------------------------------------------------------------------------
 
@@ -618,4 +678,7 @@ def get_controls_exports() -> Dict[str, Any]:
         "screenshot": screenshot,
         # JavaScript
         "run_js": run_js,
+        # Cookie 持久化
+        "save_cookies": save_cookies,
+        "load_cookies": load_cookies,
     }
