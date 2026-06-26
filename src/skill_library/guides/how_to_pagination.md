@@ -1,4 +1,4 @@
-# 如何实现通用分页翻页
+﻿# 如何实现通用分页翻页
 
 ## 适用场景
 需要遍历多页内容（搜索结果、列表、商品等）。
@@ -27,12 +27,12 @@
 - 翻页太快可能触发**反爬机制**
 
 ## 参考代码
-→ 见 `interactions/pagination.py`
+→ 见 `others/pagination.py`
 
 ## 使用方式
 ```python
 # 使用通用模板
-from skill_library.interactions.pagination import run
+from skill_library.others.pagination import run
 run("a.next", max_pages=10, wait_seconds=2.0)
 
 # 手动组合

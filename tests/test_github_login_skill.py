@@ -1,11 +1,11 @@
-"""Tests for the GitHub login skill adapter."""
+﻿"""Tests for the GitHub login skill adapter."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 from src.core.script_engine import ScriptEngine
-from src.skill_library.domains.github_login import run
+from src.skill_library.others.github_login import run
 
 
 def _ok_step(*args):
@@ -85,7 +85,7 @@ def test_github_login_reports_two_factor():
 
 
 def test_github_login_source_runs_inside_script_engine():
-    source = Path("src/skill_library/domains/github_login.py").read_text(
+    source = Path("src/skill_library/others/github_login.py").read_text(
         encoding="utf-8"
     )
     engine = ScriptEngine()

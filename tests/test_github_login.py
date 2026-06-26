@@ -8,7 +8,7 @@ TEST_USERNAME = os.getenv("GITHUB_USERNAME", "feitianduowen")
 TEST_PASSWORD = os.getenv("GITHUB_PASSWORD", "xxxxxxxx")
 
 
-def test_github_login():
+def run_github_login():
     """Run GitHub login through the natural-language agent flow."""
     print("开始测试 GitHub 登录...")
     print(f"用户名: {TEST_USERNAME}")
@@ -28,4 +28,4 @@ def test_github_login():
 
 
 if __name__ == "__main__":
-    test_github_login()
+    run_github_login()

@@ -1,0 +1,42 @@
+id: amazon_search
+name: Amazon 搜索
+type: domain
+description: 在 Amazon 搜索商品
+version: "1.0.0"
+
+triggers:
+  - amazon
+  - 亚马逊
+  - 购物
+  - 商品
+
+url_patterns:
+  - "*.amazon.com"
+
+domain: null
+
+parameters:
+  keyword:
+    type: string
+    required: true
+    description: 商品关键词
+
+steps:
+  - action: goto
+    args:
+      url: "https://www.amazon.com"
+    comment: 导航到 Amazon 首页
+
+  - action: fill
+    target: "#twotabsearchtextbox"
+    value: "{{keyword}}"
+    comment: 输入商品关键词
+
+  - action: click
+    target: "#nav-search-submit-button"
+    comment: 点击搜索按钮
+
+  - action: wait_for_navigation
+    args:
+      timeout: 10
+    comment: 等待搜索结果页加载

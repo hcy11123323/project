@@ -1,4 +1,4 @@
-# 站点目录 — 20 个国内可访问网站
+﻿# 站点目录 — 20 个国内可访问网站
 
 本文档列出 20 个适合自动化的国内网站，包含目标 URL、关键选择器、自动化流程和注意事项。
 
@@ -778,6 +778,6 @@ src/skill_library/
 
 每个技能需要的文件：
 1. `domains/{site}.yaml` — 域配置（选择器）
-2. `src/skill_library/domains/{site}.py` — 技能脚本
+2. `src/skill_library/<category>/{site}.py` — 技能脚本
 3. `src/skill_library/skills.yaml` — 技能注册
 4. `tests/test_skill_{site}.py` — 单元测试

@@ -43,7 +43,7 @@ def load_skill(yaml_path: str) -> SkillConfig:
 
 
 def load_skills_from_dir(skills_dir: str = "skills") -> List[SkillConfig]:
-    """扫描目录下所有 *.yaml 文件并加载为技能列表。
+    """递归扫描目录下所有 *.yaml 文件并加载为技能列表。
 
     跳过无法解析的文件（打印警告但不中断）。
 
@@ -58,7 +58,7 @@ def load_skills_from_dir(skills_dir: str = "skills") -> List[SkillConfig]:
         return []
 
     configs: List[SkillConfig] = []
-    for yaml_file in sorted(dir_path.glob("*.yaml")):
+    for yaml_file in sorted(dir_path.rglob("*.yaml")):
         try:
             config = load_skill(str(yaml_file))
             configs.append(config)

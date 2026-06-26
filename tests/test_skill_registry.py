@@ -1,4 +1,4 @@
-"""Tests for skill_library.registry -- SkillRegistry, SkillFileMapping, SkillDetail, YAML loading."""
+﻿"""Tests for skill_library.registry -- SkillRegistry, SkillFileMapping, SkillDetail, YAML loading."""
 
 from __future__ import annotations
 
@@ -77,12 +77,12 @@ def skills_yaml_content():
         "sources": [
             {
                 "id": "domain/baidu_search",
-                "file": "domains/baidu_search.py",
+                "file": "search/baidu_search.py",
                 "entry": "run",
             },
             {
                 "id": "interaction/search_flow",
-                "file": "interactions/search_flow.py",
+                "file": "search/search_flow.py",
             },
         ],
     }
@@ -92,15 +92,13 @@ def skills_yaml_content():
 def registry_with_yaml(tmp_path, skills_yaml_content):
     """Create a SkillRegistry loaded from a temp skills.yaml with real file stubs."""
     # Create source files
-    domains_dir = tmp_path / "domains"
-    domains_dir.mkdir()
-    (domains_dir / "baidu_search.py").write_text(
+    search_dir = tmp_path / "search"
+    search_dir.mkdir()
+    (search_dir / "baidu_search.py").write_text(
         "def run(keyword):\n    pass\n", encoding="utf-8"
     )
 
-    interactions_dir = tmp_path / "interactions"
-    interactions_dir.mkdir()
-    (interactions_dir / "search_flow.py").write_text(
+    (search_dir / "search_flow.py").write_text(
         "def run(url, keyword):\n    pass\n", encoding="utf-8"
     )
 
@@ -308,7 +306,7 @@ class TestSkillRegistryYamlLoading:
         detail = reg.get_detail("domain/baidu_search")
         assert detail is not None
         assert detail.file_mapping is not None
-        assert detail.file_mapping.file == "domains/baidu_search.py"
+        assert detail.file_mapping.file == "search/baidu_search.py"
         assert detail.file_mapping.entry == "run"
 
     def test_load_from_yaml_source_default_entry(self, registry_with_yaml):
@@ -477,13 +475,13 @@ class TestMatchesUrl:
 class TestInferGuidePath:
     def test_infers_correctly(self, tmp_path):
         reg = SkillRegistry(library_dir=tmp_path)
-        fm = SkillFileMapping(id="test", file="domains/baidu_search.py")
+        fm = SkillFileMapping(id="test", file="search/baidu_search.py")
         guide_path = reg._infer_guide_path(fm)
         assert guide_path == tmp_path / "guides" / "how_to_baidu_search.md"
 
     def test_no_library_dir(self):
         reg = SkillRegistry()
-        fm = SkillFileMapping(id="test", file="domains/baidu_search.py")
+        fm = SkillFileMapping(id="test", file="search/baidu_search.py")
         assert reg._infer_guide_path(fm) is None
 
 

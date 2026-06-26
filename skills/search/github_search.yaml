@@ -1,0 +1,43 @@
+id: github_search
+name: GitHub 搜索
+type: domain
+description: 在 GitHub 搜索仓库、代码或用户
+version: "1.0.0"
+
+triggers:
+  - github
+  - 搜索
+  - search
+  - 仓库
+  - repo
+
+url_patterns:
+  - "github.com/search"
+
+domain: github
+
+parameters:
+  keyword:
+    type: string
+    required: true
+    description: 搜索关键词
+
+steps:
+  - action: goto
+    args:
+      url: "https://github.com/search"
+    comment: 导航到 GitHub 搜索页
+
+  - action: smart_fill
+    target: search_input
+    value: "{{keyword}}"
+    comment: 输入搜索关键词
+
+  - action: smart_click
+    target: search_button
+    comment: 提交搜索
+
+  - action: wait_for_navigation
+    args:
+      timeout: 10
+    comment: 等待搜索结果页加载

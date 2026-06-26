@@ -143,6 +143,18 @@ class TestLoadSkillsFromDir:
         ids = {c.id for c in configs}
         assert ids == {"baidu_search", "login_flow"}
 
+    def test_load_nested_directories(self, tmp_path, sample_skill_data):
+        skills_dir = tmp_path / "skills"
+        nested_dir = skills_dir / "search"
+        nested_dir.mkdir(parents=True)
+        (nested_dir / "baidu_search.yaml").write_text(
+            yaml.dump(sample_skill_data, allow_unicode=True), encoding="utf-8"
+        )
+
+        configs = load_skills_from_dir(str(skills_dir))
+
+        assert [c.id for c in configs] == ["baidu_search"]
+
     def test_skip_invalid_files(self, skills_dir, capsys):
         configs = load_skills_from_dir(str(skills_dir))
         # Should load 2 valid, skip 1 invalid

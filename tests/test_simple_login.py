@@ -1,17 +1,17 @@
-"""Simple GitHub login test."""
+﻿"""Simple GitHub login test."""
 
 import os
 
 from src.core.browser_manager import get_browser_manager
 from src.core.script_engine import ScriptEngine
 from src.layer_2.controls import get_controls_exports
-from src.skill_library.domains.github_login import run as github_login
+from src.skill_library.others.github_login import run as github_login
 
 TEST_USERNAME = os.getenv("GITHUB_USERNAME", "feitianduowen")
 TEST_PASSWORD = os.getenv("GITHUB_PASSWORD", "xxxxxxxx")
 
 
-def test_simple():
+def run_simple_login():
     """Run the GitHub login flow in a visible browser."""
     print("=== GitHub 登录测试 ===")
     print(f"用户名: {TEST_USERNAME}")
@@ -65,4 +65,4 @@ log("截图已保存: github_login_test.png")
 
 
 if __name__ == "__main__":
-    test_simple()
+    run_simple_login()

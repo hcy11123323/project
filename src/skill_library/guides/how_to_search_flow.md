@@ -1,4 +1,4 @@
-# 如何实现通用搜索
+﻿# 如何实现通用搜索
 
 ## 适用场景
 需要在任意网站实现搜索功能，没有现成的站点适配器。
@@ -24,12 +24,12 @@
 - 有的网站搜索框在页面顶部固定，需要先滚动到可见区域
 
 ## 参考代码
-→ 见 `interactions/search_flow.py`
+→ 见 `search/search_flow.py`
 
 ## 使用方式
 ```python
 # 使用通用模板
-from skill_library.interactions.search_flow import run
+from skill_library.search.search_flow import run
 run("https://example.com", "#search", "#search-btn", "Python")
 
 # 使用控件层

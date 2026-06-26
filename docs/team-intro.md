@@ -1,4 +1,4 @@
-# 项目介绍：Agentic Playwright MCP
+﻿# 项目介绍：Agentic Playwright MCP
 
 > 本文档面向团队成员，帮助快速理解项目目标、架构设计和协作方式。
 
@@ -314,7 +314,7 @@ locators:
 **第二步**：创建技能脚本
 
 ```python
-# src/skill_library/domains/my_site.py
+# src/skill_library/search/my_site.py
 """我的网站适配器。"""
 
 def run(keyword: str):
@@ -360,7 +360,7 @@ make test
 ### 7.2 添加通用交互模板
 
 ```python
-# src/skill_library/interactions/download_flow.py
+# src/skill_library/export/download_flow.py
 """通用下载流程模板。"""
 
 def run(url: str, download_selector: str, wait_seconds: float = 5.0):

@@ -1,0 +1,42 @@
+id: youtube_search
+name: YouTube 搜索
+type: domain
+description: 在 YouTube 搜索视频
+version: "1.0.0"
+
+triggers:
+  - youtube
+  - 油管
+  - 视频
+  - 搜索
+
+url_patterns:
+  - "*.youtube.com"
+
+domain: null
+
+parameters:
+  keyword:
+    type: string
+    required: true
+    description: 视频关键词
+
+steps:
+  - action: goto
+    args:
+      url: "https://www.youtube.com"
+    comment: 导航到 YouTube 首页
+
+  - action: fill
+    target: "input[name='search_query']"
+    value: "{{keyword}}"
+    comment: 输入视频关键词
+
+  - action: click
+    target: "button#search-icon-legacy"
+    comment: 点击搜索按钮
+
+  - action: wait_for_navigation
+    args:
+      timeout: 10
+    comment: 等待搜索结果页加载
