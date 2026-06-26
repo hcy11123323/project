@@ -7,14 +7,19 @@ Playwright / CloakBrowser 浏览器生命周期管理器。
   - true: CloakBrowser（反检测 Chromium，需 pip install agentic-playwright-mcp[stealth]）
 
 所有页面操作通过 get_page() 获取统一入口。
+
+域名认证持久化：
+  launch_with_domain(domain) 会自动加载该站点的 storage_state（如有），
+  save_auth(domain) 在登录成功后保存 cookie / localStorage。
 """
 
 from __future__ import annotations
 
 import os
 
-from playwright.sync_api import Page, sync_playwright
+from playwright.sync_api import BrowserContext, Page, sync_playwright
 
+from src.core.auth_manager import get_auth_manager
 from src.core.event_bus import (
     EVENT_BROWSER_CLOSE,
     EVENT_BROWSER_LAUNCH,
@@ -52,8 +57,10 @@ class BrowserManager:
     def __init__(self) -> None:
         self._playwright = None
         self._browser = None
+        self._context: BrowserContext | None = None
         self._page = None
         self._engine: str = "playwright"  # "playwright" | "cloakbrowser"
+        self._current_domain: str | None = None
 
     @property
     def engine(self) -> str:
@@ -111,7 +118,8 @@ class BrowserManager:
             headless=headless,
             slow_mo=slow_mo,
         )
-        self._page = self._browser.new_page()
+        self._context = self._browser.new_context()
+        self._page = self._context.new_page()
         log_browser_event("launched", engine="playwright", headless=headless)
 
         after_event = Event(
@@ -163,7 +171,8 @@ class BrowserManager:
             launch_kwargs["proxy"] = proxy
 
         self._browser = cloakbrowser.launch(**launch_kwargs)
-        self._page = self._browser.new_page()
+        self._context = self._browser.new_context()
+        self._page = self._context.new_page()
         log_browser_event(
             "launched", engine="cloakbrowser", headless=headless, humanize=humanize
         )
@@ -210,13 +219,20 @@ class BrowserManager:
 
         logger.info("Closing browser", extra={"engine": self._engine})
         try:
+            if self._context is not None:
+                self._context.close()
+        except Exception as exc:
+            logger.warning("Error closing context", extra={"error": str(exc)})
+        try:
             if self._browser is not None:
                 self._browser.close()
         except Exception as exc:
             logger.warning("Error closing browser", extra={"error": str(exc)})
         finally:
             self._browser = None
+            self._context = None
             self._page = None
+            self._current_domain = None
 
         # CloakBrowser 不需要单独 stop playwright
         if self._engine == "playwright":
@@ -250,6 +266,104 @@ class BrowserManager:
             return True
         except Exception:
             return False
+
+    # ------------------------------------------------------------------
+    # 域名认证持久化
+    # ------------------------------------------------------------------
+
+    def launch_with_domain(
+        self,
+        domain: str,
+        headless: bool = False,
+        slow_mo: int = 500,
+        humanize: bool = False,
+        proxy: str | None = None,
+    ) -> Page:
+        """启动浏览器并自动加载该站点的 storage_state（如有）。
+
+        浏览器已启动时，会关闭旧 context 并创建新的 context
+        （不重新启动浏览器进程，速度快）。
+
+        Args:
+            domain: 站点名（对应 domains/{domain}.yaml）。
+            headless: 是否无头模式。
+            slow_mo: 操作间延迟（毫秒）。
+            humanize: CloakBrowser 真人行为模拟。
+            proxy: 代理地址。
+
+        Returns:
+            加载完成的 Page 实例。
+        """
+        am = get_auth_manager()
+
+        # 浏览器已启动 → 只替换 context
+        if self.is_alive() and self._browser is not None:
+            # 关闭旧 context
+            if self._context is not None:
+                try:
+                    self._context.close()
+                except Exception:
+                    pass
+
+            # 创建新 context（带或不带 storage_state）
+            ctx_kwargs: dict = {}
+            auth_data = am.load_auth(domain)
+            if auth_data:
+                ctx_kwargs["storage_state"] = auth_data
+                logger.info("Loaded auth for domain=%s", domain)
+            else:
+                logger.info("No auth found for domain=%s, using fresh context", domain)
+
+            self._context = self._browser.new_context(**ctx_kwargs)
+            self._page = self._context.new_page()
+            self._current_domain = domain
+            return self._page
+
+        # 浏览器未启动 → 完整启动流程
+        self.launch(headless=headless, slow_mo=slow_mo, humanize=humanize, proxy=proxy)
+
+        # launch() 已创建 context，如果有 auth 则重新创建带 auth 的 context
+        auth_data = am.load_auth(domain)
+        if auth_data and self._browser is not None:
+            # 关闭无 auth 的 context
+            if self._context is not None:
+                try:
+                    self._context.close()
+                except Exception:
+                    pass
+            self._context = self._browser.new_context(storage_state=auth_data)
+            self._page = self._context.new_page()
+            logger.info("Loaded auth for domain=%s", domain)
+
+        self._current_domain = domain
+        return self._page
+
+    def save_auth(self, domain: str | None = None) -> bool:
+        """保存当前 context 的 storage_state。
+
+        Args:
+            domain: 站点名。为 None 时使用 launch_with_domain 设置的 domain。
+
+        Returns:
+            True 保存成功，False 无 context 可保存。
+        """
+        if self._context is None:
+            logger.warning("Cannot save auth: no active context")
+            return False
+
+        target = domain or self._current_domain
+        if not target:
+            logger.warning("Cannot save auth: no domain specified")
+            return False
+
+        am = get_auth_manager()
+        am.save_auth(target, self._context)
+        return True
+
+    @property
+    def current_domain(self) -> str | None:
+        """当前加载的站点名。"""
+        return self._current_domain
 
 
 def get_browser_manager() -> BrowserManager:

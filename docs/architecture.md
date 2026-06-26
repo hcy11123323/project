@@ -173,6 +173,9 @@ sandbox = {
     "smart_login": smart_login,
     "smart_search": smart_search,
     "smart_fill_form": smart_fill_form,
+    # Cookie 持久化
+    "save_cookies": save_cookies,
+    "load_cookies": load_cookies,
     # 等待
     "wait": wait,
     "wait_for_navigation": wait_for_navigation,
@@ -271,6 +274,39 @@ CloakBrowser 是一个反检测浏览器引擎，可以绕过常见的反爬虫�
 pip install -e ".[stealth]"
 USE_CLOAKBROWSER=true make run
 ```
+
+### Cookie 持久化
+
+支持按站点保存和恢复浏览器登录状态，使用 Playwright 的 `storage_state` 机制。
+
+```python
+# src/core/auth_manager.py
+class AuthManager:
+    def list_domains(self) -> List[Dict]:      # 扫描 domains/ 并返回 auth 状态
+    def has_auth(self, domain: str) -> bool:   # 检查是否有已保存的 cookie
+    def load_auth(self, domain: str) -> Dict:  # 加载 storage_state
+    def save_auth(self, domain, context):       # 从 BrowserContext 保存
+    def delete_auth(self, domain: str) -> bool: # 删除
+```
+
+**存储结构**：
+
+```
+~/.agentic-playwright/
+├── config.yaml           # 全局配置
+└── auth/
+    ├── baidu.json        # domains/baidu.yaml → storage_state
+    ├── github.json
+    └── ...
+```
+
+**自动适配**：新增 `domains/*.yaml` 站点时，cookie 管理自动支持，无需额外配置。
+
+**集成方式**：
+
+- `browser_manager.launch_with_domain(domain)` — 自动加载已有 cookie
+- `smart_login()` — 登录成功后自动保存 cookie
+- `save_cookies(domain)` / `load_cookies(domain)` — 脚本中手动调用
 
 ## 视觉模块
 

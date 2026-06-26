@@ -192,7 +192,9 @@ class TestSmartLogin:
 
         result = smart_login("test", "admin", "1234")
         assert result["success"] is True
-        assert len(result["steps"]) == 5
+        # 6 steps: navigate, fill_username, fill_password, click_submit,
+        #          wait_navigation, save_cookies
+        assert len(result["steps"]) == 6
 
     @patch("src.layer_2.controls._DOMAINS_DIR")
     @patch("src.layer_2.controls.load_domain")
