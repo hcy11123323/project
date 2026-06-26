@@ -1,4 +1,4 @@
-# 如何实现百度搜索
+﻿# 如何实现百度搜索
 
 ## 适用场景
 需要在百度搜索关键词并获取搜索结果。
@@ -21,12 +21,12 @@
 - 百度首页加载较慢，建议等待时间设置长一些
 
 ## 参考代码
-→ 见 `domains/baidu_search.py`
+→ 见 `search/baidu_search.py`
 
 ## 使用方式
 ```python
 # 方式一：直接调用适配器
-from skill_library.domains.baidu_search import run
+from skill_library.search.baidu_search import run
 run("Python 教程")
 
 # 方式二：使用控件层

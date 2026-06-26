@@ -1,4 +1,4 @@
-# 如何实现通用登录
+﻿# 如何实现通用登录
 
 ## 适用场景
 需要在任意网站实现登录功能，没有现成的站点适配器。
@@ -29,7 +29,7 @@
 - 有的网站登录按钮是 `<a>` 而非 `<button>`
 
 ## 参考代码
-→ 见 `interactions/login_flow.py`
+→ 见 `others/login_flow.py`
 
 ## 使用方式
 ```python
@@ -40,7 +40,7 @@ smart_login("example", "admin", "1234",
             submit_field="login_btn")
 
 # 使用通用模板
-from skill_library.interactions.login_flow import run
+from skill_library.others.login_flow import run
 run("https://example.com/login",
     "#email", "#password", "#login-btn",
     "admin", "1234")

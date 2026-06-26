@@ -1,4 +1,4 @@
-# 如何实现 GitHub 登录
+﻿# 如何实现 GitHub 登录
 
 ## 适用场景
 需要登录 GitHub 进行仓库操作、代码查看等。
@@ -23,12 +23,12 @@
 - **邮箱验证**: 首次登录新设备可能需要邮箱验证
 
 ## 参考代码
-→ 见 `domains/github_login.py`
+→ 见 `others/github_login.py`
 
 ## 使用方式
 ```python
 # 方式一：直接调用适配器
-from skill_library.domains.github_login import run
+from skill_library.others.github_login import run
 run("myuser", "mypassword")
 
 # 方式二：使用控件层

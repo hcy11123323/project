@@ -1,4 +1,4 @@
-# 技能开发完整流程
+﻿# 技能开发完整流程
 
 本文档介绍如何从零开始设计、开发、测试和部署一个站点技能。
 
@@ -115,7 +115,7 @@ skills:
 
 sources:
   - id: domain/example
-    file: "domains/example.py"
+    file: "search/example.py"
     entry: "run"
 ```
 
@@ -144,7 +144,7 @@ def run(keyword: str):
 
 ### 3.1 创建技能文件
 
-创建 `src/skill_library/domains/example.py`：
+创建 `src/skill_library/search/example.py`：
 
 ```python
 """示例网站适配器 —— 直接执行或作为范例参考。"""
@@ -315,7 +315,7 @@ class TestExampleSkill:
 
     def test_skill_file_importable(self):
         """Should be able to import the skill file."""
-        from src.skill_library.domains.example import run
+        from src.skill_library.search.example import run
         assert callable(run)
 
     def test_skill_registered(self):
@@ -367,7 +367,7 @@ make lint
 make test
 
 # 3. 提交
-git add src/skill_library/domains/example.py
+git add src/skill_library/search/example.py
 git add src/skill_library/skills.yaml
 git add domains/example.yaml
 git add tests/test_skill_example.py
@@ -424,7 +424,7 @@ locators:
 ### 技能脚本
 
 ```python
-# src/skill_library/domains/baidu_search.py
+# src/skill_library/search/baidu_search.py
 def run(keyword: str):
     goto("https://www.baidu.com")
     fill("#kw", keyword)
@@ -451,7 +451,7 @@ skills:
 ```python
 # tests/test_skill_baidu.py
 def test_baidu_search_skill():
-    from src.skill_library.domains.baidu_search import run
+    from src.skill_library.search.baidu_search import run
     assert callable(run)
 ```
 

@@ -1,0 +1,42 @@
+id: zhihu_search
+name: 知乎搜索
+type: domain
+description: 在知乎搜索指定关键词
+version: "1.0.0"
+
+triggers:
+  - 知乎
+  - zhihu
+  - 搜索
+  - 问答
+
+url_patterns:
+  - "*.zhihu.com"
+
+domain: zhihu
+
+parameters:
+  keyword:
+    type: string
+    required: true
+    description: 搜索关键词
+
+steps:
+  - action: goto
+    args:
+      url: "https://www.zhihu.com"
+    comment: 导航到知乎首页
+
+  - action: smart_fill
+    target: search_input
+    value: "{{keyword}}"
+    comment: 输入搜索关键词
+
+  - action: smart_click
+    target: search_button
+    comment: 点击搜索按钮
+
+  - action: wait_for_navigation
+    args:
+      timeout: 10
+    comment: 等待搜索结果页加载

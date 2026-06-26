@@ -1,4 +1,4 @@
-# 技能库指南
+﻿# 技能库指南
 
 本文档介绍如何使用和创建 Agentic Playwright MCP 的技能。
 
@@ -17,7 +17,7 @@
 针对特定网站的完整自动化流程：
 
 ```python
-# src/skill_library/domains/baidu_search.py
+# src/skill_library/search/baidu_search.py
 from skill_library.skill_base import SkillBase, SkillResult, SkillContext
 
 class BaiduSearchSkill(SkillBase):
@@ -40,7 +40,7 @@ class BaiduSearchSkill(SkillBase):
 通用的 UI 交互模式，适用于任意网站：
 
 ```python
-# src/skill_library/interactions/login_flow.py
+# src/skill_library/others/login_flow.py
 from skill_library.skill_base import SkillBase, SkillResult, SkillContext
 
 class LoginFlowSkill(SkillBase):
@@ -140,7 +140,7 @@ skills:
       - baidu
     url_patterns:
       - "*.baidu.com"
-    file: domains/baidu_search.py
+    file: search/baidu_search.py
     function: run
     description: 在百度搜索关键词
     priority: 10
@@ -155,7 +155,7 @@ skills:
       - sign in
     url_patterns:
       - "*"
-    file: interactions/login_flow.py
+    file: others/login_flow.py
     function: run
     description: 通用登录流程
     priority: 5
@@ -184,7 +184,7 @@ skills:
 1. 创建技能文件：
 
 ```python
-# src/skill_library/domains/my_site.py
+# src/skill_library/search/my_site.py
 from skill_library.skill_base import SkillBase, SkillResult, SkillContext
 
 class MySiteSkill(SkillBase):
@@ -221,14 +221,14 @@ class MySiteSkill(SkillBase):
 
 2. 注册技能（自动发现）：
 
-将文件放入 `src/skill_library/domains/` 目录，系统会自动发现并注册。
+将文件放入 `src/skill_library/search/` 目录，系统会自动发现并注册。
 
 ### 方式二：YAML + 函数
 
 1. 创建技能函数：
 
 ```python
-# src/skill_library/domains/my_site.py
+# src/skill_library/search/my_site.py
 async def run(page, task: str, **kwargs):
     """我的网站自动化"""
     await page.goto("https://example.com")
@@ -250,7 +250,7 @@ skills:
       - my site
     url_patterns:
       - "*.example.com"
-    file: domains/my_site.py
+    file: search/my_site.py
     function: run
     description: 自动化操作我的网站
 ```
@@ -387,7 +387,7 @@ browser-agent run "在百度搜索 Python 教程" --max-steps 5
 ### 百度搜索
 
 ```python
-# src/skill_library/domains/baidu_search.py
+# src/skill_library/search/baidu_search.py
 class BaiduSearchSkill(SkillBase):
     id = "baidu_search"
     name = "百度搜索"
@@ -405,7 +405,7 @@ class BaiduSearchSkill(SkillBase):
 ### GitHub 登录
 
 ```python
-# src/skill_library/domains/github_login.py
+# src/skill_library/others/github_login.py
 class GithubLoginSkill(SkillBase):
     id = "github_login"
     name = "GitHub 登录"
@@ -426,7 +426,7 @@ class GithubLoginSkill(SkillBase):
 ### 通用登录
 
 ```python
-# src/skill_library/interactions/login_flow.py
+# src/skill_library/others/login_flow.py
 class LoginFlowSkill(SkillBase):
     id = "login_flow"
     name = "通用登录"

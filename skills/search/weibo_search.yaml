@@ -1,0 +1,42 @@
+id: weibo_search
+name: 微博搜索
+type: domain
+description: 在微博搜索指定关键词
+version: "1.0.0"
+
+triggers:
+  - 微博
+  - weibo
+  - 搜索
+  - search
+
+url_patterns:
+  - "*.weibo.com"
+
+domain: weibo
+
+parameters:
+  keyword:
+    type: string
+    required: true
+    description: 搜索关键词
+
+steps:
+  - action: goto
+    args:
+      url: "https://s.weibo.com"
+    comment: 导航到微博搜索页
+
+  - action: smart_fill
+    target: search_input
+    value: "{{keyword}}"
+    comment: 输入搜索关键词
+
+  - action: smart_click
+    target: search_button
+    comment: 点击搜索按钮
+
+  - action: wait_for_navigation
+    args:
+      timeout: 10
+    comment: 等待搜索结果页加载

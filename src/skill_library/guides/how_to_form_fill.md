@@ -1,4 +1,4 @@
-# 如何实现通用表单填写
+﻿# 如何实现通用表单填写
 
 ## 适用场景
 需要填写任意网站的表单（注册、设置、提交信息等）。
@@ -49,12 +49,12 @@ page.set_input_files("#avatar", "path/to/file.jpg")
 - 提交后可能有**确认弹窗**需要处理
 
 ## 参考代码
-→ 见 `interactions/form_fill.py`
+→ 见 `others/form_fill.py`
 
 ## 使用方式
 ```python
 # 使用通用模板
-from skill_library.interactions.form_fill import run
+from skill_library.others.form_fill import run
 run("https://example.com/register", {
     "#name": "张三",
     "#email": "test@example.com",

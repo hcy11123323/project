@@ -1,4 +1,4 @@
-# skills.yaml -- 技能索引配置
+﻿# skills.yaml -- 技能索引配置
 #
 # 本文件是 skill_library 的唯一数据源，由 SkillRegistry.load_from_yaml() 加载。
 # 替代原来的 registry.json，统一使用 YAML 格式。
@@ -147,65 +147,65 @@ skills:
 # id 必须与上方 skills 中的 id 一致
 sources:
   - id: "domain/baidu_search"
-    file: "domains/baidu_search.py"
+    file: "search/baidu_search.py"
     entry: "run"
 
   - id: "domain/google_search"
-    file: "domains/google_search.py"
+    file: "search/google_search.py"
     entry: "run"
 
   - id: "domain/bing_search"
-    file: "domains/bing_search.py"
+    file: "search/bing_search.py"
     entry: "run"
 
   - id: "domain/github_login"
-    file: "domains/github_login.py"
+    file: "others/github_login.py"
     entry: "run"
 
   - id: "domain/github_search"
-    file: "domains/github_search.py"
+    file: "search/github_search.py"
     entry: "run"
 
   - id: "domain/github_repos"
-    file: "domains/github_repos.py"
+    file: "others/github_repos.py"
     entry: "run"
 
   - id: "domain/amazon_search"
-    file: "domains/amazon_search.py"
+    file: "search/amazon_search.py"
     entry: "run"
 
   - id: "domain/gmail_inbox"
-    file: "domains/gmail_inbox.py"
+    file: "send/gmail_inbox.py"
     entry: "run"
 
   - id: "domain/outlook_inbox"
-    file: "domains/outlook_inbox.py"
+    file: "send/outlook_inbox.py"
     entry: "run"
 
   - id: "domain/youtube_search"
-    file: "domains/youtube_search.py"
+    file: "search/youtube_search.py"
     entry: "run"
 
   - id: "domain/weibo_search"
-    file: "domains/weibo_search.py"
+    file: "search/weibo_search.py"
     entry: "run"
 
   - id: "domain/zhihu_search"
-    file: "domains/zhihu_search.py"
+    file: "search/zhihu_search.py"
     entry: "run"
 
   - id: "interaction/login_flow"
-    file: "interactions/login_flow.py"
+    file: "others/login_flow.py"
     entry: "run"
 
   - id: "interaction/search_flow"
-    file: "interactions/search_flow.py"
+    file: "search/search_flow.py"
     entry: "run"
 
   - id: "interaction/form_fill"
-    file: "interactions/form_fill.py"
+    file: "others/form_fill.py"
     entry: "run"
 
   - id: "interaction/pagination"
-    file: "interactions/pagination.py"
+    file: "others/pagination.py"
     entry: "run"
